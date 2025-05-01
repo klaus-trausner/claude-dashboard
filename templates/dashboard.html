@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MQTT Dashboard{% endblock %}
+
+{% block heading %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .dashboard-card {
+        transition: transform 0.3s;
+    }
+    .dashboard-card:hover {
+        transform: translateY(-5px);
+    }
+    .overview-value {
+        font-size: 2em;
+        font-weight: bold;
+    }
+    .chart-container {
+        height: 300px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card data-card">
+            <div class="card-header data-card-header d-flex justify-content-between">
+                <h3>System Overview</h3>
+                <div>
+                    <span class="badge bg-info" id="last-updated">Updating...</span>
+                    <button class="btn btn-primary btn-sm ms-2" onclick="refreshDashboard()">Refresh</button>
+                </div>
+            </div>
+            <div class="card-body data-card-body">
+                <div class="row" id="overview-cards">
+                    <!-- Overview cards will be inserted here dynamically -->
+                    <div class="col text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card data-card h-100">
+            <div class="card-header data-card-header">
+                <h3>Temperature Trends</h3>
+            </div>
+            <div class="card-body data-card-body">
+                <div class="chart-container">
+                    <canvas id="temperatureChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card data-card h-100">
+            <div class="card-header data-card-header">
+                <h3>Humidity Trends</h3>
+            </div>
+            <div class="card-body data-card-body">
+                <div class="chart-container">
+                    <canvas id="humidityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card data-card h-100">
+            <div class="card-header data-card-header">
+                <h3>Zisterne Level</h3>
+            </div>
+            <div class="card-body data-card-body">
+                <div class="chart-container">
+                    <canvas id="zisterneChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card data-card h-100">
+            <div class="card-header data-card-header">
+                <h3>Other Measurements</h3>
+            </div>
+            <div class="card-body data-card-body">
+                <div class="chart-container">
+                    <canvas id="otherChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Chart objects
+    let temperatureChart, humidityChart, zisterneChart, otherChart;
+    
+    // Helper function to get a color based on the index
+    function getColor(index) {
+        const colors = [
+            'rgba(75, 192, 192, 0.7)',
+            'rgba(255, 99, 132, 0.7)',
+            'rgba(54, 162, 235, 0.7)',
+            'rgba(255, 206, 86, 0.7)',
+            'rgba(153, 102, 255, 0.7)',
+            'rgba(255, 159, 64, 0.7)',
+            'rgba(199, 199, 199, 0.7)',
+            'rgba(83, 102, 255, 0.7)',
+        ];
+        return colors[index % colors.length];
+    }
+    
+    // Function to initialize charts
+    function initializeCharts() {
+        const temperatureCtx = document.getElementById('temperatureChart').getContext('2d');
+        temperatureChart = new Chart(temperatureCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    }
+                }
+            }
+        });
+        
+        const humidityCtx = document.getElementById('humidityChart').getContext('2d');
+        humidityChart = new Chart(humidityCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Humidity (%)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    }
+                }
+            }
+        });
+        
+        const zisterneCtx = document.getElementById('zisterneChart').getContext('2d');
+        zisterneChart = new Chart(zisterneCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Level (cm)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    }
+                }
+            }
+        });
+        
+        const otherCtx = document.getElementById('otherChart').getContext('2d');
+        otherChart = new Chart(otherCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Value'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Function to update overview cards
+    function updateOverviewCards(data) {
+        const overviewContainer = document.getElementById('overview-cards');
+        overviewContainer.innerHTML = '';
+        
+        // Define important sensors to display in overview
+        const keySensors = [
+            { topic: 'esp32/temperature', title: 'Temperature', unit: '°C', icon: 'bi-thermometer-half' },
+            { topic: 'esp32/humidity', title: 'Humidity', unit: '%', icon: 'bi-droplet-half' },
+            { topic: 'esp32/zisterne', title: 'Zisterne', unit: 'cm', icon: 'bi-water' },
+            { topic: 'esp32/pressure', title: 'Pressure', unit: 'hPa', icon: 'bi-speedometer' },
+            { topic: 'bodenfeuchte', title: 'Soil Moisture', unit: '%', icon: 'bi-flower1' },
+            { topic: 'steuerungstemperatur', title: 'Control Temp', unit: '°C', icon: 'bi-thermometer' }
+        ];
+        
+        keySensors.forEach(sensor => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 col-sm-6 mb-3';
+            
+            let value = 'N/A';
+            let timestamp = '';
+            
+            if (data[sensor.topic]) {
+                value = data[sensor.topic].value;
+                timestamp = data[sensor.topic].timestamp;
+            }
+            
+            col.innerHTML = `
+                <div class="card dashboard-card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi ${sensor.icon} fs-1 mb-2 text-primary"></i>
+                        <h5 class="card-title">${sensor.title}</h5>
+                        <div class="overview-value">${value} ${sensor.unit}</div>
+                        <p class="card-text text-muted small">Last updated: ${timestamp}</p>
+                    </div>
+                </div>
+            `;
+            
+            overviewContainer.appendChild(col);
+        });
+        
+        // Update the last updated timestamp
+        document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+    }
+    
+    // Function to update charts with historical data
+    function updateCharts(historicalData) {
+        // Temperature chart
+        const temperatureTopics = Object.keys(historicalData).filter(topic => topic.includes('temperature'));
+        updateChart(temperatureChart, temperatureTopics, historicalData);
+        
+        // Humidity chart
+        const humidityTopics = Object.keys(historicalData).filter(topic => topic.includes('humidity'));
+        updateChart(humidityChart, humidityTopics, historicalData);
+        
+        // Zisterne chart
+        const zisterneTopics = Object.keys(historicalData).filter(topic => topic.includes('zisterne'));
+        updateChart(zisterneChart, zisterneTopics, historicalData);
+        
+        // Other measurements chart
+        const otherTopics = Object.keys(historicalData).filter(topic => 
+            !topic.includes('temperature') && 
+            !topic.includes('humidity') && 
+            !topic.includes('zisterne') &&
+            !topic.includes('status') &&
+            !topic.includes('send_settings') &&
+            !topic.includes('test')
+        );
+        updateChart(otherChart, otherTopics, historicalData);
+    }
+    
+    // Helper function to update a specific chart
+    function updateChart(chart, topics, historicalData) {
+        // Clear existing datasets
+        chart.data.datasets = [];
+        
+        // If no topics or no data, return early
+        if (topics.length === 0) {
+            chart.update();
+            return;
+        }
+        
+        // Find the topic with the most data points to use as labels
+        let maxDataPoints = 0;
+        let topicWithMostData = topics[0];
+        
+        topics.forEach(topic => {
+            const dataLength = historicalData[topic]?.length || 0;
+            if (dataLength > maxDataPoints) {
+                maxDataPoints = dataLength;
+                topicWithMostData = topic;
+            }
+        });
+        
+        // Set labels from the topic with most data points
+        if (maxDataPoints > 0) {
+            chart.data.labels = historicalData[topicWithMostData].map(item => {
+                const timestamp = item.timestamp;
+                return timestamp.split(' ')[1]; // Just show the time part
+            });
+        } else {
+            chart.data.labels = [];
+        }
+        
+        // Add datasets for each topic
+        topics.forEach((topic, index) => {
+            if (!historicalData[topic] || historicalData[topic].length === 0) {
+                return;
+            }
+            
+            const topicName = topic.includes('/') ? topic.split('/').pop() : topic;
+            const color = getColor(index);
+            
+            const values = historicalData[topic].map(item => {
+                // Try to parse the value
+                try {
+                    return parseFloat(item.value);
+                } catch (e) {
+                    return null;
+                }
+            });
+            
+            chart.data.datasets.push({
+                label: topicName,
+                data: values,
+                borderColor: color,
+                backgroundColor: color.replace('0.7', '0.1'),
+                tension: 0.4,
+                pointRadius: 2,
+                pointHoverRadius: 5
+            });
+        });
+        
+        chart.update();
+    }
+    
+    // Function to refresh dashboard data
+    function refreshDashboard() {
+        // Fetch current data for overview cards
+        fetch('/api/current_data')
+            .then(response => response.json())
+            .then(data => {
+                updateOverviewCards(data);
+            })
+            .catch(error => {
+                console.error('Error fetching current data:', error);
+            });
+        
+        // Fetch historical data for charts
+        fetch('/api/historical_data')
+            .then(response => response.json())
+            .then(data => {
+                updateCharts(data);
+            })
+            .catch(error => {
+                console.error('Error fetching historical data:', error);
+            });
+    }
+    
+    // Initialize charts and load data when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        // Add Bootstrap icons
+        const iconLink = document.createElement('link');
+        iconLink.rel = 'stylesheet';
+        iconLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css';
+        document.head.appendChild(iconLink);
+        
+        initializeCharts();
+        refreshDashboard();
+        // Auto refresh every 30 seconds
+        setInterval(refreshDashboard, 30000);
+    });
+</script>
+{% endblock %}

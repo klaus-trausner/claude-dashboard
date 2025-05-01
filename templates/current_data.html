@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Current Data - MQTT Dashboard{% endblock %}
+
+{% block heading %}Current Data{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <div class="card data-card">
+            <div class="card-header data-card-header d-flex justify-content-between">
+                <h3>Latest Sensor Readings</h3>
+                <button class="btn btn-primary btn-sm" onclick="refreshData()">Refresh Data</button>
+            </div>
+            <div class="card-body data-card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Topic</th>
+                                <th>Value</th>
+                                <th>Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body">
+                            <tr>
+                                <td colspan="3" class="text-center">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row" id="data-cards-container">
+    <!-- Data cards will be dynamically inserted here -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Function to format the display of sensor data
+    function formatValue(topic, value) {
+        // Try to parse the value as JSON
+        try {
+            const jsonValue = JSON.parse(value);
+            if (typeof jsonValue === 'object') {
+                // Format JSON object as a pretty list
+                let formattedValue = '<ul class="list-group">';
+                for (const [key, val] of Object.entries(jsonValue)) {
+                    formattedValue += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>${key}</span>
+                        <span class="badge bg-primary rounded-pill">${val}</span>
+                    </li>`;
+                }
+                formattedValue += '</ul>';
+                return formattedValue;
+            }
+            return jsonValue;
+        } catch (e) {
+            // Not JSON, return as is with some basic formatting based on topic
+            if (topic.includes('temperature')) {
+                return `${value} °C`;
+            } else if (topic.includes('humidity')) {
+                return `${value} %`;
+            } else if (topic.includes('pressure')) {
+                return `${value} hPa`;
+            } else if (topic.includes('zisterne')) {
+                return `${value} cm`;
+            } else if (topic.includes('bodenfeuchte')) {
+                return `${value} %`;
+            } else {
+                return value;
+            }
+        }
+    }
+
+    // Function to determine the appropriate icon for each sensor
+    function getTopicIcon(topic) {
+        if (topic.includes('temperature')) {
+            return 'bi bi-thermometer-half';
+        } else if (topic.includes('humidity')) {
+            return 'bi bi-droplet-half';
+        } else if (topic.includes('pressure')) {
+            return 'bi bi-speedometer';
+        } else if (topic.includes('zisterne')) {
+            return 'bi bi-water';
+        } else if (topic.includes('bodenfeuchte')) {
+            return 'bi bi-flower1';
+        } else if (topic.includes('status')) {
+            return 'bi bi-info-circle';
+        } else {
+            return 'bi bi-diagram-3';
+        }
+    }
+
+    // Function to fetch and display current data
+    function refreshData() {
+        fetch('/api/current_data')
+            .then(response => response.json())
+            .then(data => {
+                // Update table
+                const tableBody = document.getElementById('data-table-body');
+                tableBody.innerHTML = '';
+                
+                if (Object.keys(data).length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="3" class="text-center">No data available yet</td></tr>';
+                    return;
+                }
+                
+                // Sort topics alphabetically
+                const sortedTopics = Object.keys(data).sort();
+                
+                // Populate table
+                sortedTopics.forEach(topic => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${topic}</td>
+                        <td>${data[topic].value}</td>
+                        <td>${data[topic].timestamp}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+                
+                // Update data cards
+                const cardsContainer = document.getElementById('data-cards-container');
+                cardsContainer.innerHTML = '';
+                
+                // Create a card for each topic group
+                const topicGroups = groupTopics(sortedTopics);
+                
+                Object.entries(topicGroups).forEach(([groupName, topics]) => {
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'col-md-12 mb-4';
+                    
+                    let cardsHtml = `
+                        <div class="card data-card">
+                            <div class="card-header data-card-header">
+                                <h4>${groupName.charAt(0).toUpperCase() + groupName.slice(1)}</h4>
+                            </div>
+                            <div class="card-body data-card-body">
+                                <div class="row">
+                    `;
+                    
+                    topics.forEach(topic => {
+                        const value = data[topic].value;
+                        const timestamp = data[topic].timestamp;
+                        const formattedValue = formatValue(topic, value);
+                        const icon = getTopicIcon(topic);
+                        
+                        cardsHtml += `
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <span class="${icon} me-2"></span>
+                                        ${topic.split('/').pop()}
+                                    </div>
+                                    <div class="card-body">
+                                        <h5 class="card-title">${formattedValue}</h5>
+                                        <p class="card-text text-muted small">Last updated: ${timestamp}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    cardsHtml += `
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    groupDiv.innerHTML = cardsHtml;
+                    cardsContainer.appendChild(groupDiv);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching current data:', error);
+                const tableBody = document.getElementById('data-table-body');
+                tableBody.innerHTML = `<tr><td colspan="3" class="text-center text-danger">Error fetching data: ${error.message}</td></tr>`;
+            });
+    }
+    
+    // Function to group topics by their prefix/category
+    function groupTopics(topics) {
+        const groups = {};
+        
+        topics.forEach(topic => {
+            let groupName;
+            if (topic.includes('/')) {
+                groupName = topic.split('/')[0];
+            } else {
+                groupName = 'general';
+            }
+            
+            if (!groups[groupName]) {
+                groups[groupName] = [];
+            }
+            
+            groups[groupName].push(topic);
+        });
+        
+        return groups;
+    }
+
+    // Load data initially and setup auto-refresh
+    document.addEventListener('DOMContentLoaded', () => {
+        // Add Bootstrap icons
+        const iconLink = document.createElement('link');
+        iconLink.rel = 'stylesheet';
+        iconLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css';
+        document.head.appendChild(iconLink);
+        
+        refreshData();
+        setInterval(refreshData, 10000); // Refresh every 10 seconds
+    });
+</script>
+{% endblock %}

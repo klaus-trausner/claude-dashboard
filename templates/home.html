@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Home - MQTT Dashboard{% endblock %}
+
+{% block heading %}Home{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card data-card">
+            <div class="card-header data-card-header">
+                <h3>Welcome to the MQTT Dashboard</h3>
+            </div>
+            <div class="card-body data-card-body">
+                <p>This dashboard provides real-time monitoring and visualization of MQTT data from various sensors and devices.</p>
+                <p>Use the navigation menu on the left to access different views:</p>
+                <ul>
+                    <li><strong>Dashboard</strong> - Overview of all sensor data in graphical format</li>
+                    <li><strong>Current Data</strong> - Latest readings from all sensors</li>
+                    <li><strong>Long Time Data</strong> - Historical data and trends over time</li>
+                </ul>
+                <p>MQTT connection status: <span id="mqtt-status" class="badge bg-secondary">Checking...</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Check MQTT connection status
+    function checkMqttStatus() {
+        fetch('/api/current_data')
+            .then(response => response.json())
+            .then(data => {
+                const statusElement = document.getElementById('mqtt-status');
+                if (Object.keys(data).length > 0) {
+                    statusElement.textContent = 'Connected';
+                    statusElement.className = 'badge bg-success';
+                } else {
+                    statusElement.textContent = 'Waiting for data...';
+                    statusElement.className = 'badge bg-warning';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking MQTT status:', error);
+                const statusElement = document.getElementById('mqtt-status');
+                statusElement.textContent = 'Error';
+                statusElement.className = 'badge bg-danger';
+            });
+    }
+
+    // Check status initially and every 5 seconds
+    checkMqttStatus();
+    setInterval(checkMqttStatus, 5000);
+</script>
+{% endblock %}

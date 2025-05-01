@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}Long Time Data - MQTT Dashboard{% endblock %}
+
+{% block heading %}Long Time Data Analysis{% endblock %}
+
+{% block extra_head %}
+<style>
+    .chart-container {
+        height: 400px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    .time-selector {
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card data-card">
+            <div class="card-header data-card-header">
+                <h3>Historical Data Analysis</h3>
+            </div>
+            <div class="card-body data-card-body">
+                <p class="lead">Explore long-term trends and patterns in your sensor data.</p>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="topic-selector">Select Topic</label>
+                            <select id="topic-selector" class="form-select">
+                                <option value="">-- Select a Topic --</option>
+                                <!-- Topics will be populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="time-range">Time Range</label>
+                            <select id="time-range" class="form-select">
+                                <option value="all">All Available Data</option>
+                                <option value="hour">Last Hour</option>
+                                <option value="day">Last 24 Hours</option>
+                                <option value="week">Last Week</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <button id="update-chart-btn" class="btn btn-primary">Update Chart</button>
+                        <button id="download-data-btn" class="btn btn-secondary ms-2">Download Data as CSV</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card data-card">
+            <div class="card-header data-card-header">
+                <h3 id="chart-title">Data Visualization</h3>
+            </div>
+            <div class="card-body data-card-body">
+                <div class="chart-container">
+                    <canvas id="historical-chart"></canvas>
+                </div>
+                <div id="no-data-message" class="text-center d-none">
+                    <p class="lead text-muted">No data available for the selected topic and time range.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card data-card">
+            <div class="card-header data-card-header">
+                <h3>Data Statistics</h3>
+            </div>
+            <div class="card-body data-card-body">
+                <div class="row">
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Minimum</h5>
+                                <p id="min-value" class="display-6">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Maximum</h5>
+                                <p id="max-value" class="display-6">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Average</h5>
+                                <p id="avg-value" class="display-6">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">Latest</h5>
+                                <p id="latest-value" class="display-6">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Chart object
+    let historicalChart;
+    
+    // Function to initialize the chart
+    function initializeChart() {
+        const ctx = document.getElementById('historical-chart').getContext('2d');
+        historicalChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Data',
+                    data: [],
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Value'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                return tooltipItems[0].label;
+                            }
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+    }
+    
+    // Function to populate topic selector
+    function populateTopicSelector() {
+        fetch('/api/topics')
+            .then(response => response.json())
+            .then(topics => {
+                const selector = document.getElementById('topic-selector');
+                topics.forEach(topic => {
+                    const option = document.createElement('option');
+                    option.value = topic;
+                    option.textContent = topic;
+                    selector.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching topics:', error);
+            });
+    }
+    
+    // Function to update the chart based on selected topic and time range
+    function updateChart() {
+        const topic = document.getElementById('topic-selector').value;
+        const timeRange = document.getElementById('time-range').value;
+        
+        if (!topic) {
+            document.getElementById('no-data-message').classList.remove('d-none');
+            historicalChart.data.labels = [];
+            historicalChart.data.datasets[0].data = [];
+            historicalChart.update();
+            resetStatistics();
+            return;
+        }
+        
+        fetch('/api/historical_data')
+            .then(response => response.json())
+            .then(data => {
+                const topicData = data[topic];
+                
+                if (!topicData || topicData.length === 0) {
+                    document.getElementById('no-data-message').classList.remove('d-none');
+                    historicalChart.data.labels = [];
+                    historicalChart.data.datasets[0].data = [];
+                    historicalChart.update();
+                    resetStatistics();
+                    return;
+                }
+                
+                document.getElementById('no-data-message').classList.add('d-none');
+                
+                // Filter data based on selected time range
+                let filteredData = [...topicData];
+                const now = new Date();
+                
+                if (timeRange === 'hour') {
+                    const hourAgo = new Date(now - 60 * 60 * 1000);
+                    filteredData = topicData.filter(item => new Date(item.timestamp) >= hourAgo);
+                } else if (timeRange === 'day') {
+                    const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
+                    filteredData = topicData.filter(item => new Date(item.timestamp) >= dayAgo);
+                } else if (timeRange === 'week') {
+                    const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+                    filteredData = topicData.filter(item => new Date(item.timestamp) >= weekAgo);
+                }
+                
+                // Update chart
+                historicalChart.data.labels = filteredData.map(item => item.timestamp);
+                
+                // Try to parse values as numbers
+                const values = filteredData.map(item => {
+                    try {
+                        return parseFloat(item.value);
+                    } catch (e) {
+                        return null;
+                    }
+                });
+                
+                historicalChart.data.datasets[0].label = topic;
+                historicalChart.data.datasets[0].data = values;
+                
+                // Update chart title
+                document.getElementById('chart-title').textContent = `${topic} - ${getTimeRangeLabel(timeRange)}`;
+                
+                // Update y-axis label based on topic
+                if (topic.includes('temperature')) {
+                    historicalChart.options.scales.y.title.text = 'Temperature (°C)';
+                } else if (topic.includes('humidity')) {
+                    historicalChart.options.scales.y.title.text = 'Humidity (%)';
+                } else if (topic.includes('pressure')) {
+                    historicalChart.options.scales.y.title.text = 'Pressure (hPa)';
+                } else if (topic.includes('zisterne')) {
+                    historicalChart.options.scales.y.title.text = 'Level (cm)';
+                } else {
+                    historicalChart.options.scales.y.title.text = 'Value';
+                }
+                
+                historicalChart.update();
+                
+                // Update statistics
+                updateStatistics(values);
+            })
+            .catch(error => {
+                console.error('Error fetching historical data:', error);
+                document.getElementById('no-data-message').classList.remove('d-none');
+            });
+    }
+    
+    // Helper function to get time range label
+    function getTimeRangeLabel(timeRange) {
+        switch (timeRange) {
+            case 'hour': return 'Last Hour';
+            case 'day': return 'Last 24 Hours';
+            case 'week': return 'Last Week';
+            default: return 'All Data';
+        }
+    }
+    
+    // Function to update statistics display
+    function updateStatistics(values) {
+        // Filter out null/NaN values
+        const validValues = values.filter(val => val !== null && !isNaN(val));
+        
+        if (validValues.length === 0) {
+            resetStatistics();
+            return;
+        }
+        
+        const min = Math.min(...validValues);
+        const max = Math.max(...validValues);
+        const sum = validValues.reduce((a, b) => a + b, 0);
+        const avg = sum / validValues.length;
+        const latest = validValues[validValues.length - 1];
+        
+        document.getElementById('min-value').textContent = min.toFixed(2);
+        document.getElementById('max-value').textContent = max.toFixed(2);
+        document.getElementById('avg-value').textContent = avg.toFixed(2);
+        document.getElementById('latest-value').textContent = latest.toFixed(2);
+    }
+    
+    // Function to reset statistics display
+    function resetStatistics() {
+        document.getElementById('min-value').textContent = '-';
+        document.getElementById('max-value').textContent = '-';
+        document.getElementById('avg-value').textContent = '-';
+        document.getElementById('latest-value').textContent = '-';
+    }
+    
+    // Function to download data as CSV
+    function downloadCSV() {
+        const topic = document.getElementById('topic-selector').value;
+        const timeRange = document.getElementById('time-range').value;
+        
+        if (!topic) {
+            alert('Please select a topic first.');
+            return;
+        }
+        
+        fetch('/api/historical_data')
+            .then(response => response.json())
+            .then(data => {
+                const topicData = data[topic];
+                
+                if (!topicData || topicData.length === 0) {
+                    alert('No data available for the selected topic.');
+                    return;
+                }
+                
+                // Filter data based on selected time range
+                let filteredData = [...topicData];
+                const now = new Date();
+                
+                if (timeRange === 'hour') {
+                    const hourAgo = new Date(now - 60 * 60 * 1000);
+                    filteredData = topicData.filter(item => new Date(item.timestamp) >= hourAgo);
+                } else if (timeRange === 'day') {
+                    const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
+                    filteredData = topicData.filter(item => new Date(item.timestamp) >= dayAgo);
+                } else if (timeRange === 'week') {
+                    const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+                    filteredData = topicData.filter(item => new Date(item.timestamp) >= weekAgo);
+                }
+                
+                // Create CSV content
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += "Timestamp,Value\n";
+                
+                filteredData.forEach(item => {
+                    csvContent += `${item.timestamp},${item.value}\n`;
+                });
+                
+                // Create download link
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `${topic.replace(/\//g, '_')}_${timeRange}_data.csv`);
+                document.body.appendChild(link);
+                
+                // Trigger download
+                link.click();
+                document.body.removeChild(link);
+            })
+            .catch(error => {
+                console.error('Error fetching historical data:', error);
+                alert('Error downloading data. Please try again.');
+            });
+    }
+    
+    // Initialize the page
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeChart();
+        populateTopicSelector();
+        
+        // Set up event listeners
+        document.getElementById('update-chart-btn').addEventListener('click', updateChart);
+        document.getElementById('download-data-btn').addEventListener('click', downloadCSV);
+        
+        // Also update when topic or time range changes
+        document.getElementById('topic-selector').addEventListener('change', function() {
+            if (this.value) {
+                updateChart();
+            }
+        });
+        
+        document.getElementById('time-range').addEventListener('change', function() {
+            const topic = document.getElementById('topic-selector').value;
+            if (topic) {
+                updateChart();
+            }
+        });
+    });
+</script>
+{% endblock %}
