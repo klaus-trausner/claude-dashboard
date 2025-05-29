@@ -20,6 +20,29 @@
         height: 300px;
         margin-bottom: 20px;
     }
+    /* Style for settings */
+    .setting-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #eee;
+    }
+    .setting-item:last-child {
+        border-bottom: none;
+    }
+    .setting-item label {
+        flex-basis: 40%; /* Adjust as needed */
+        margin-right: 1rem;
+        font-weight: 500;
+    }
+    .setting-item .input-group {
+        flex-basis: 60%; /* Adjust as needed */
+    }
+    .setting-status {
+        min-width: 80px; /* Space for Saved!/Error */
+        text-align: right;
+    }
 </style>
 {% endblock %}
 
@@ -47,6 +70,23 @@
         </div>
     </div>
 </div>
+
+<!-- Settings Card - Added -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card data-card">
+            <div class="card-header data-card-header">
+                <h3>Device Settings (send_settings)</h3>
+            </div>
+            <div class="card-body data-card-body" id="settings-card-body">
+                <p>Loading settings...</p>
+                <!-- Settings will be loaded here by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+<!-- End Settings Card -->
+
 
 <div class="row">
     <div class="col-md-6 mb-4">
@@ -104,141 +144,42 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Include HTMX -->
+<script src="https://unpkg.com/htmx.org@1.9.10/dist/htmx.min.js"></script>
+
 <script>
     // Chart objects
     let temperatureChart, humidityChart, zisterneChart, otherChart;
-    
+
     // Helper function to get a color based on the index
     function getColor(index) {
         const colors = [
-            'rgba(75, 192, 192, 0.7)',
-            'rgba(255, 99, 132, 0.7)',
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(255, 206, 86, 0.7)',
-            'rgba(153, 102, 255, 0.7)',
-            'rgba(255, 159, 64, 0.7)',
-            'rgba(199, 199, 199, 0.7)',
-            'rgba(83, 102, 255, 0.7)',
+            'rgba(75, 192, 192, 0.7)', 'rgba(255, 99, 132, 0.7)',
+            'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)',
+            'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)',
+            'rgba(199, 199, 199, 0.7)', 'rgba(83, 102, 255, 0.7)',
         ];
         return colors[index % colors.length];
     }
-    
+
     // Function to initialize charts
     function initializeCharts() {
+        // ... (keep existing chart initialization code) ...
         const temperatureCtx = document.getElementById('temperatureChart').getContext('2d');
-        temperatureChart = new Chart(temperatureCtx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: []
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Temperature (°C)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    }
-                }
-            }
-        });
-        
+        temperatureChart = new Chart(temperatureCtx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { title: { display: true, text: 'Temperature (°C)' }}, x: { title: { display: true, text: 'Time' }}} } });
         const humidityCtx = document.getElementById('humidityChart').getContext('2d');
-        humidityChart = new Chart(humidityCtx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: []
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Humidity (%)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    }
-                }
-            }
-        });
-        
+        humidityChart = new Chart(humidityCtx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { title: { display: true, text: 'Humidity (%)' }}, x: { title: { display: true, text: 'Time' }}} } });
         const zisterneCtx = document.getElementById('zisterneChart').getContext('2d');
-        zisterneChart = new Chart(zisterneCtx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: []
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Level (cm)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    }
-                }
-            }
-        });
-        
+        zisterneChart = new Chart(zisterneCtx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { title: { display: true, text: 'Level (cm)' }}, x: { title: { display: true, text: 'Time' }}} } });
         const otherCtx = document.getElementById('otherChart').getContext('2d');
-        otherChart = new Chart(otherCtx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: []
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Value'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    }
-                }
-            }
-        });
+        otherChart = new Chart(otherCtx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { title: { display: true, text: 'Value' }}, x: { title: { display: true, text: 'Time' }}} } });
     }
-    
+
     // Function to update overview cards
     function updateOverviewCards(data) {
         const overviewContainer = document.getElementById('overview-cards');
-        overviewContainer.innerHTML = '';
-        
+        overviewContainer.innerHTML = ''; // Clear existing
+
         // Define important sensors to display in overview
         const keySensors = [
             { topic: 'esp32/temperature', title: 'Temperature', unit: '°C', icon: 'bi-thermometer-half' },
@@ -247,164 +188,194 @@
             { topic: 'esp32/pressure', title: 'Pressure', unit: 'hPa', icon: 'bi-speedometer' },
             { topic: 'bodenfeuchte', title: 'Soil Moisture', unit: '%', icon: 'bi-flower1' },
             { topic: 'steuerungstemperatur', title: 'Control Temp', unit: '°C', icon: 'bi-thermometer' }
+            // Note: 'send_settings' is not typically shown here, it has its own card now.
         ];
-        
+
+        if (Object.keys(data).length === 0) {
+             overviewContainer.innerHTML = '<div class="col text-center"><p>No overview data received yet.</p></div>';
+             return;
+        }
+
+        let cardsHtml = '';
         keySensors.forEach(sensor => {
-            const col = document.createElement('div');
-            col.className = 'col-md-4 col-sm-6 mb-3';
-            
             let value = 'N/A';
             let timestamp = '';
-            
+            let displayValue = 'N/A';
+
             if (data[sensor.topic]) {
                 value = data[sensor.topic].value;
                 timestamp = data[sensor.topic].timestamp;
+                // Basic formatting for overview
+                displayValue = `${value} ${sensor.unit}`;
+                 // Handle potential JSON objects if other topics return them (unlikely based on current code)
+                if (typeof value === 'object' && value !== null) {
+                    displayValue = '[Object]'; // Simple placeholder for overview
+                }
             }
-            
-            col.innerHTML = `
-                <div class="card dashboard-card h-100">
-                    <div class="card-body text-center">
-                        <i class="bi ${sensor.icon} fs-1 mb-2 text-primary"></i>
-                        <h5 class="card-title">${sensor.title}</h5>
-                        <div class="overview-value">${value} ${sensor.unit}</div>
-                        <p class="card-text text-muted small">Last updated: ${timestamp}</p>
+
+            cardsHtml += `
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                    <div class="card dashboard-card h-100">
+                        <div class="card-body text-center">
+                            <i class="bi ${sensor.icon} fs-1 mb-2 text-primary"></i>
+                            <h5 class="card-title">${sensor.title}</h5>
+                            <div class="overview-value">${displayValue}</div>
+                            <p class="card-text text-muted small">Updated: ${timestamp.split(' ')[1] || 'never'}</p>
+                        </div>
                     </div>
                 </div>
             `;
-            
-            overviewContainer.appendChild(col);
         });
-        
+         if (!cardsHtml) {
+             cardsHtml = '<div class="col text-center"><p>No matching sensor data for overview.</p></div>';
+         }
+        overviewContainer.innerHTML = cardsHtml;
+
         // Update the last updated timestamp
         document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
     }
-    
+
+    // --- Function to update the Settings Card ---
+    function updateSettingsCard(data) {
+        const settingsContainer = document.getElementById('settings-card-body');
+        settingsContainer.innerHTML = ''; // Clear previous content
+
+        if (!data || !data['send_settings'] || typeof data['send_settings'].value !== 'object') {
+            settingsContainer.innerHTML = '<p class="text-muted">Settings data (send_settings topic) not yet received or not in expected format.</p>';
+            return;
+        }
+
+        const settings = data['send_settings'].value; // This should be the dictionary
+        const settingsTimestamp = data['send_settings'].timestamp;
+        let settingsHtml = `<p class="text-muted small mb-3">Last received: ${settingsTimestamp}</p>`;
+
+        // Sort keys alphabetically for consistent order
+        const sortedKeys = Object.keys(settings).sort();
+
+        sortedKeys.forEach(key => {
+            const value = settings[key];
+            // Use number input for things that look like numbers, text otherwise
+            const inputType = /^\d+(\.\d+)?$/.test(value) ? 'number' : 'text';
+            const stepValue = inputType === 'number' ? 'any' : ''; // Allow decimals for number type
+
+            // Unique ID for the status span
+            const statusId = `setting-status-${key}`;
+
+            settingsHtml += `
+                <div class="setting-item">
+                    <label for="setting-${key}">${key}:</label>
+                    <div class="input-group input-group-sm">
+                        <input type="${inputType}" step="${stepValue}" class="form-control form-control-sm" id="setting-${key}" name="${key}" value="${value}">
+                        <button class="btn btn-outline-secondary" type="button"
+                                hx-post="/api/change_setting"
+                                hx-include="#setting-${key}"
+                                hx-vals='{"setting_name": "${key}", "setting_value": document.getElementById("setting-${key}").value}'
+                                hx-target="#${statusId}"
+                                hx-swap="innerHTML">
+                            Save
+                        </button>
+                        <span id="${statusId}" class="setting-status align-self-center"></span>
+                    </div>
+                </div>
+            `;
+        });
+
+        settingsContainer.innerHTML = settingsHtml;
+        // IMPORTANT: After adding HTML containing hx attributes, tell HTMX to process the new content
+        htmx.process(settingsContainer);
+    }
+    // --- End Settings Card Update Function ---
+
+
     // Function to update charts with historical data
     function updateCharts(historicalData) {
+        // ... (keep existing updateChart logic) ...
         // Temperature chart
         const temperatureTopics = Object.keys(historicalData).filter(topic => topic.includes('temperature'));
         updateChart(temperatureChart, temperatureTopics, historicalData);
-        
         // Humidity chart
         const humidityTopics = Object.keys(historicalData).filter(topic => topic.includes('humidity'));
         updateChart(humidityChart, humidityTopics, historicalData);
-        
         // Zisterne chart
         const zisterneTopics = Object.keys(historicalData).filter(topic => topic.includes('zisterne'));
         updateChart(zisterneChart, zisterneTopics, historicalData);
-        
         // Other measurements chart
-        const otherTopics = Object.keys(historicalData).filter(topic => 
-            !topic.includes('temperature') && 
-            !topic.includes('humidity') && 
-            !topic.includes('zisterne') &&
-            !topic.includes('status') &&
-            !topic.includes('send_settings') &&
-            !topic.includes('test')
+        const otherTopics = Object.keys(historicalData).filter(topic =>
+            !topic.includes('temperature') && !topic.includes('humidity') &&
+            !topic.includes('zisterne') && !topic.includes('status') &&
+            !topic.includes('send_settings') && !topic.includes('test') // Exclude settings from 'Other'
         );
         updateChart(otherChart, otherTopics, historicalData);
     }
-    
+
     // Helper function to update a specific chart
     function updateChart(chart, topics, historicalData) {
-        // Clear existing datasets
+        // ... (keep existing updateChart logic) ...
         chart.data.datasets = [];
-        
-        // If no topics or no data, return early
-        if (topics.length === 0) {
-            chart.update();
-            return;
-        }
-        
-        // Find the topic with the most data points to use as labels
+        if (topics.length === 0) { chart.update(); return; }
         let maxDataPoints = 0;
         let topicWithMostData = topics[0];
-        
         topics.forEach(topic => {
             const dataLength = historicalData[topic]?.length || 0;
-            if (dataLength > maxDataPoints) {
-                maxDataPoints = dataLength;
-                topicWithMostData = topic;
-            }
+            if (dataLength > maxDataPoints) { maxDataPoints = dataLength; topicWithMostData = topic; }
         });
-        
-        // Set labels from the topic with most data points
-        if (maxDataPoints > 0) {
-            chart.data.labels = historicalData[topicWithMostData].map(item => {
-                const timestamp = item.timestamp;
-                return timestamp.split(' ')[1]; // Just show the time part
-            });
-        } else {
-            chart.data.labels = [];
-        }
-        
-        // Add datasets for each topic
+        if (maxDataPoints > 0 && historicalData[topicWithMostData]) {
+            chart.data.labels = historicalData[topicWithMostData].map(item => item.timestamp.split(' ')[1]);
+        } else { chart.data.labels = []; }
         topics.forEach((topic, index) => {
-            if (!historicalData[topic] || historicalData[topic].length === 0) {
-                return;
-            }
-            
+            if (!historicalData[topic] || historicalData[topic].length === 0) { return; }
             const topicName = topic.includes('/') ? topic.split('/').pop() : topic;
             const color = getColor(index);
-            
-            const values = historicalData[topic].map(item => {
-                // Try to parse the value
-                try {
-                    return parseFloat(item.value);
-                } catch (e) {
-                    return null;
-                }
-            });
-            
-            chart.data.datasets.push({
-                label: topicName,
-                data: values,
-                borderColor: color,
-                backgroundColor: color.replace('0.7', '0.1'),
-                tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 5
-            });
+            const values = historicalData[topic].map(item => { try { return parseFloat(item.value); } catch (e) { return null; } });
+            chart.data.datasets.push({ label: topicName, data: values, borderColor: color, backgroundColor: color.replace('0.7', '0.1'), tension: 0.4, pointRadius: 2, pointHoverRadius: 5 });
         });
-        
         chart.update();
     }
-    
+
     // Function to refresh dashboard data
     function refreshDashboard() {
-        // Fetch current data for overview cards
+        console.log("Refreshing dashboard data...");
+        // Fetch current data for overview cards AND settings
         fetch('/api/current_data')
             .then(response => response.json())
             .then(data => {
+                console.log("Current data received:", data);
                 updateOverviewCards(data);
+                updateSettingsCard(data); // <-- Update settings card
             })
             .catch(error => {
                 console.error('Error fetching current data:', error);
+                document.getElementById('overview-cards').innerHTML = '<div class="col text-center text-danger">Error loading overview data.</div>';
+                document.getElementById('settings-card-body').innerHTML = '<p class="text-danger">Error loading settings data.</p>';
             });
-        
+
         // Fetch historical data for charts
         fetch('/api/historical_data')
             .then(response => response.json())
             .then(data => {
+                 console.log("Historical data received");
                 updateCharts(data);
             })
             .catch(error => {
                 console.error('Error fetching historical data:', error);
+                 // Optionally display error messages on charts
             });
     }
-    
+
     // Initialize charts and load data when page loads
     document.addEventListener('DOMContentLoaded', () => {
-        // Add Bootstrap icons
-        const iconLink = document.createElement('link');
-        iconLink.rel = 'stylesheet';
-        iconLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css';
-        document.head.appendChild(iconLink);
-        
+        // Add Bootstrap icons (if not already in base.html)
+        if (!document.querySelector('link[href*="bootstrap-icons"]')) {
+            const iconLink = document.createElement('link');
+            iconLink.rel = 'stylesheet';
+            iconLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css'; // Use a more recent version if desired
+            document.head.appendChild(iconLink);
+        }
+
         initializeCharts();
-        refreshDashboard();
+        refreshDashboard(); // Initial load
         // Auto refresh every 30 seconds
-        setInterval(refreshDashboard, 30000);
+        setInterval(refreshDashboard, 30000); // 30 seconds
     });
 </script>
 {% endblock %}
