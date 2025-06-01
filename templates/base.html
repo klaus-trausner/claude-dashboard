@@ -85,6 +85,16 @@
                                 Long Time Data
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == url_for('login_page') %}active{% endif %}" href="{{ url_for('login_page') }}">
+                                Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == url_for('register_page') %}active{% endif %}" href="{{ url_for('register_page') }}">
+                                Register
+                            </a>
+                        </li>
                     </ul>
                 </div>
             </nav>

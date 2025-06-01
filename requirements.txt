@@ -1,0 +1,8 @@
+Flask
+paho-mqtt
+Flask-SQLAlchemy
+Flask-Migrate
+bcrypt
+Flask-JWT-Extended
+pytest
+pytest-flask
