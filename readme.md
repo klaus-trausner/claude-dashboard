@@ -10,6 +10,7 @@ This application provides a web-based dashboard for monitoring MQTT data from va
 - Current data overview
 - Data export capabilities
 - Responsive design for desktop and mobile
+- Ability to change device settings via an API endpoint.
 
 ## Technical Stack
 
@@ -57,20 +58,22 @@ This application provides a web-based dashboard for monitoring MQTT data from va
 
 ### Directory Structure
 
+The project has the following core structure:
 ```
 mqtt-flask-dashboard/
 ├── app.py              # Main Flask application
+├── static/             # Static assets (CSS, JavaScript, images)
+│   └── css/
+│       └── style.css   # Custom CSS
 ├── templates/          # HTML templates
 │   ├── base.html       # Base template with navigation
 │   ├── home.html       # Home page
 │   ├── dashboard.html  # Dashboard with visualizations
 │   ├── current_data.html  # Current sensor readings
 │   └── long_time_data.html  # Historical data analysis
-├── static/             # Static assets
-│   └── css/
-│       └── style.css   # Custom CSS
 └── README.md           # This file
 ```
+(Note: A virtual environment directory like `venv/` or `.claude/` may also be present if you follow the setup instructions, but it's not part of the core project files.)
 
 ### Configuration
 
@@ -90,13 +93,21 @@ MQTT_TOPICS = [
     "bodenfeuchte",
     "steuerungstemperatur",
     "status",
-    "send_settings",
+    "send_settings",  # Topic used by devices to publish their current settings
     "ext1/temperature",
     "ext1/humidity",
     "innen",
     "test"
 ]
 ```
+The `send_settings` topic is used by devices to publish their current settings to the application. The application listens to this topic to stay updated on device configurations.
+
+The application also uses a separate MQTT topic to send setting changes *to* devices:
+```python
+# Topic to publish setting changes to
+MQTT_PUBLISH_TOPIC_SETTINGS = "changeSetting"
+```
+This topic is used by the `/api/change_setting` endpoint.
 
 You can modify these settings to match your MQTT broker configuration.
 
@@ -120,6 +131,53 @@ You can modify these settings to match your MQTT broker configuration.
 - **Dashboard**: Overview of all sensor data with charts and key metrics
 - **Current Data**: Latest readings from all sensors in tabular and card format
 - **Long Time Data**: Historical data with filtering options and statistics
+
+## API Endpoints
+
+- **`/api/current_data` (GET)**: Retrieves the most recent data for all MQTT topics.
+  Example response:
+  ```json
+  {
+    "esp32/temperature": {"value": "25.5", "timestamp": "YYYY-MM-DD HH:MM:SS"},
+    "esp32/humidity": {"value": "60", "timestamp": "YYYY-MM-DD HH:MM:SS"}
+  }
+  ```
+- **`/api/historical_data` (GET)**: Retrieves the last 100 data points for each MQTT topic.
+  Example response:
+  ```json
+  {
+    "esp32/temperature": [
+      {"value": "25.5", "timestamp": "YYYY-MM-DD HH:MM:SS"},
+      {"value": "25.6", "timestamp": "YYYY-MM-DD HH:MM:SS"}
+    ]
+  }
+  ```
+- **`/api/topics` (GET)**: Returns a list of all MQTT topics the application is subscribed to.
+  Example response:
+  ```json
+  [
+    "esp32/zisterne",
+    "esp32/temperature",
+    "esp32/pressure",
+    "esp32/humidity",
+    "bodenfeuchte",
+    "steuerungstemperatur",
+    "status",
+    "send_settings",
+    "ext1/temperature",
+    "ext1/humidity",
+    "innen",
+    "test"
+  ]
+  ```
+- **`/api/change_setting` (POST)**: Allows publishing a setting change to the `MQTT_PUBLISH_TOPIC_SETTINGS` topic.
+  - Method: `POST`
+  - Parameters (form data):
+    - `setting_name` (string): The name or key of the setting to change.
+    - `setting_value` (string): The new value for the setting.
+  - Action: Publishes a JSON payload `["setting_name", "setting_value"]` to the configured MQTT topic for settings changes.
+  - Success Response: HTML snippet `<span class="text-success small ms-2">Saved!</span>`
+  - Error Response: HTML snippet `<span class="text-danger small ms-2">Error saving!</span>` or `<span class="text-danger small ms-2">Server error!</span>` with appropriate HTTP status codes.
 
 ## Data Storage
 
